@@ -89,6 +89,10 @@
       roomJoined: false,
       roomBusy: false,
       roomError: '',
+      rolePasswordA: '',
+      rolePasswordB: '',
+      roleError: '',
+      roleBusy: false,
       cloudStatus: firebaseConfigured ? '等待连接房间' : 'Firebase 未配置，当前只能本地使用',
       clientId: createClientId(),
       newTaskText: '',
@@ -348,11 +352,15 @@
     function joinRoomListener(code) {
       if (activeRoomRef) off(activeRoomRef);
       activeRoomRef = ref(database, roomPath(code));
+      state.role = 'none';
       state.roomCode = code;
       state.roomInput = code;
       state.roomJoined = true;
       state.roomBusy = false;
       state.roomError = '';
+      state.roleError = '';
+      state.rolePasswordA = '';
+      state.rolePasswordB = '';
       state.cloudStatus = `已连接房间 ${code}`;
       saveLocal();
 
@@ -412,7 +420,6 @@
             <span class="w-3 h-3 rounded-full ${roleDot}"></span>
             <span>当前视角：${roleText}</span>
           </span>
-          <button data-action="switch-role" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition">切换视角</button>
           ${state.roomJoined ? `<button data-action="leave-room" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">退出房间</button>` : ''}
         </div>`;
 
@@ -435,17 +442,22 @@
           </div>
           <h2 class="text-3xl font-bold mb-10 text-slate-700">欢迎，请选择你的身份</h2>
           <div class="flex flex-col sm:flex-row gap-8">
-            <button data-action="choose-role" data-role="A" class="w-64 h-64 bg-white border-4 border-blue-500 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center justify-center group">
-              <span class="text-6xl mb-4 group-hover:scale-110 transition-transform">💸</span>
+            <div class="w-72 bg-white border-4 border-blue-500 rounded-3xl shadow-xl p-6 flex flex-col items-center">
+              <span class="text-6xl mb-4">💸</span>
               <span class="text-2xl font-bold text-blue-600">我是甲方</span>
-              <span class="text-slate-500 mt-2 font-medium">发钱方 / 监督者</span>
-            </button>
-            <button data-action="choose-role" data-role="B" class="w-64 h-64 bg-white border-4 border-green-500 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center justify-center group">
-              <span class="text-6xl mb-4 group-hover:scale-110 transition-transform">📝</span>
+              <span class="text-slate-500 mt-2 mb-5 font-medium">发钱方 / 监督者</span>
+              <input id="rolePasswordA" value="${escapeHtml(state.rolePasswordA)}" inputmode="numeric" maxlength="6" placeholder="甲方密码" class="w-full border-2 border-blue-100 rounded-lg p-3 outline-none focus:border-blue-400 tracking-[.3em] text-center font-black text-lg mb-3">
+              <button data-action="choose-role" data-role="A" ${state.roleBusy ? 'disabled' : ''} class="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">进入甲方视角</button>
+            </div>
+            <div class="w-72 bg-white border-4 border-green-500 rounded-3xl shadow-xl p-6 flex flex-col items-center">
+              <span class="text-6xl mb-4">📝</span>
               <span class="text-2xl font-bold text-green-600">我是乙方</span>
-              <span class="text-slate-500 mt-2 font-medium">攒钱方 / 执行者</span>
-            </button>
+              <span class="text-slate-500 mt-2 mb-5 font-medium">攒钱方 / 执行者</span>
+              <input id="rolePasswordB" value="${escapeHtml(state.rolePasswordB)}" inputmode="numeric" maxlength="6" placeholder="乙方密码" class="w-full border-2 border-green-100 rounded-lg p-3 outline-none focus:border-green-400 tracking-[.3em] text-center font-black text-lg mb-3">
+              <button data-action="choose-role" data-role="B" ${state.roleBusy ? 'disabled' : ''} class="w-full bg-green-500 hover:bg-green-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">进入乙方视角</button>
+            </div>
           </div>
+          ${state.roleError ? `<div class="mt-8 bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">${escapeHtml(state.roleError)}</div>` : ''}
           <p class="mt-8 text-slate-400 italic text-center">祝你早日攒下足够的钱，买到想买的东西；也祝你学习进步，工作顺利。</p>
         </main>`;
     }
@@ -776,6 +788,20 @@
           state.newBountyAmount = Number(event.target.value);
         });
       }
+      const rolePasswordA = document.getElementById('rolePasswordA');
+      if (rolePasswordA) {
+        rolePasswordA.addEventListener('input', (event) => {
+          state.rolePasswordA = event.target.value.replace(/\D/g, '').slice(0, 6);
+          event.target.value = state.rolePasswordA;
+        });
+      }
+      const rolePasswordB = document.getElementById('rolePasswordB');
+      if (rolePasswordB) {
+        rolePasswordB.addEventListener('input', (event) => {
+          state.rolePasswordB = event.target.value.replace(/\D/g, '').slice(0, 6);
+          event.target.value = state.rolePasswordB;
+        });
+      }
       document.querySelectorAll('[data-edit-id]').forEach((textarea) => {
         textarea.addEventListener('input', (event) => {
           const task = findTask(event.target.dataset.editId);
@@ -791,14 +817,52 @@
     }
 
     async function chooseRole(role) {
+      const password = role === 'A' ? state.rolePasswordA.trim() : state.rolePasswordB.trim();
+      if (!validPassword(password)) {
+        updateLocal(() => {
+          state.roleError = `${role === 'A' ? '甲方' : '乙方'}密码必须是 6 位数字。`;
+        }, false);
+        return;
+      }
+      if (!activeRoomRef) return;
+
       updateLocal(() => {
-        state.role = role;
-      });
-      if (activeRoomRef) {
-        await firebaseUpdate(activeRoomRef, {
+        state.roleBusy = true;
+        state.roleError = '';
+      }, false);
+
+      try {
+        const snapshot = await get(activeRoomRef);
+        const room = snapshot.val() || {};
+        const passwordHashes = room.rolePasswordHashes || {};
+        const passwordHash = await hashPassword(password);
+        const existingHash = passwordHashes[role];
+        if (existingHash && existingHash !== passwordHash) {
+          throw new Error(`${role === 'A' ? '甲方' : '乙方'}密码不正确。`);
+        }
+
+        const updates = {
           [`members/${state.clientId}/role`]: role,
           updatedAt: serverTimestamp()
+        };
+        if (!existingHash) {
+          updates[`rolePasswordHashes/${role}`] = passwordHash;
+        }
+        await firebaseUpdate(activeRoomRef, {
+          ...updates
         });
+        updateLocal(() => {
+          state.role = role;
+          state.roleBusy = false;
+          state.roleError = '';
+          state.rolePasswordA = '';
+          state.rolePasswordB = '';
+        });
+      } catch (error) {
+        updateLocal(() => {
+          state.roleBusy = false;
+          state.roleError = error.message;
+        }, false);
       }
     }
 
@@ -943,7 +1007,6 @@
       if (action === 'clear') { clearData(); return; }
       if (action === 'choose-role') { chooseRole(target.dataset.role); return; }
       if (action === 'leave-room') { leaveRoom(); return; }
-      if (action === 'switch-role') { chooseRole(state.role === 'A' ? 'B' : 'A'); return; }
 
       updateLocal(() => {
         if (action === 'back-role') {
