@@ -534,7 +534,7 @@
               </div>
               <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <h3 class="font-bold text-lg mb-2 text-slate-800">加入房间</h3>
-                <p class="text-sm text-slate-500 mb-4">输入对方给你的 6 位房间号和登录密码。每个房间最多两个人。</p>
+                <p class="text-sm text-slate-500 mb-4">输入已创建的 6 位房间号和登录密码。每个房间最多两个人。</p>
                 <input id="roomInput" value="${escapeHtml(state.roomInput)}" inputmode="numeric" maxlength="6" placeholder="例如 123456" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <input id="roomPassword" value="${escapeHtml(state.roomPassword)}" inputmode="numeric" maxlength="6" placeholder="登录密码" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <button data-action="join-room" ${state.roomBusy || !firebaseConfigured ? 'disabled' : ''} class="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">加入已有房间</button>
