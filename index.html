@@ -178,7 +178,6 @@
         role: state.role,
         roomInput: state.roomInput,
         roomPassword: state.roomPassword,
-        roomCreatePassword: state.roomCreatePassword,
         rolePasswordA: state.rolePasswordA,
         rolePasswordB: state.rolePasswordB,
         roomCode: state.roomCode,
@@ -195,7 +194,7 @@
         state.role = parsed.role || 'none';
         state.roomInput = parsed.roomInput || '';
         state.roomPassword = parsed.roomPassword || '';
-        state.roomCreatePassword = parsed.roomCreatePassword || '';
+        state.roomCreatePassword = '';
         state.rolePasswordA = parsed.rolePasswordA || '';
         state.rolePasswordB = parsed.rolePasswordB || '';
         state.roomCode = parsed.roomCode || '';
@@ -284,7 +283,6 @@
       const roomCredentials = loadCredentials().rooms?.[roomCode];
       if (!roomCredentials) return;
       state.roomPassword = roomCredentials.roomPassword || state.roomPassword;
-      state.roomCreatePassword = roomCredentials.roomPassword || state.roomCreatePassword;
       state.rolePasswordA = roomCredentials.rolePasswords?.A || state.rolePasswordA;
       state.rolePasswordB = roomCredentials.rolePasswords?.B || state.rolePasswordB;
     }
@@ -833,7 +831,6 @@
         roomCreatePassword.addEventListener('input', (event) => {
           state.roomCreatePassword = event.target.value.replace(/\D/g, '').slice(0, 6);
           event.target.value = state.roomCreatePassword;
-          saveLocal();
         });
       }
       const newBountyText = document.getElementById('newBountyText');
