@@ -83,6 +83,8 @@
     const defaultState = () => ({
       role: 'none',
       roomInput: '',
+      roomPassword: '',
+      roomCreatePassword: '',
       roomCode: '',
       roomJoined: false,
       roomBusy: false,
@@ -94,6 +96,7 @@
       a_promptMinimized: false,
       warehouseOpen: false,
       draggedAmount: null,
+      draggedTaskId: null,
       isDragOver: false,
       ...defaultSharedState()
     });
@@ -126,7 +129,9 @@
       return Array.isArray(tasks) ? tasks.map((task) => ({
         id: Number(task.id) || 0,
         text: String(task.text || ''),
-        done: Boolean(task.done)
+        done: Boolean(task.done),
+        source: task.source === 'A' ? 'A' : 'B',
+        bountyAmount: Number(task.bountyAmount) || 0
       })) : [];
     }
 
@@ -214,6 +219,21 @@
       return String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
     }
 
+    async function hashPassword(password) {
+      if (crypto?.subtle) {
+        const bytes = new TextEncoder().encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(hashBuffer))
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join('');
+      }
+      return `plain:${password}`;
+    }
+
+    function validPassword(password) {
+      return ROOM_RE.test(password);
+    }
+
     function roomPath(code) {
       return `rooms/${code}`;
     }
@@ -223,7 +243,11 @@
         updateLocal(() => { state.roomError = '请先填写 Firebase 配置，再创建云端房间。'; }, false);
         return;
       }
-      if (state.role === 'none') return;
+      const password = state.roomCreatePassword.trim();
+      if (!validPassword(password)) {
+        updateLocal(() => { state.roomError = '登录密码必须是 6 位数字。'; }, false);
+        return;
+      }
 
       updateLocal(() => {
         state.roomBusy = true;
@@ -232,6 +256,7 @@
       }, false);
 
       try {
+        const passwordHash = await hashPassword(password);
         for (let i = 0; i < 30; i++) {
           const code = generateRoomCode();
           const candidateRef = ref(database, roomPath(code));
@@ -242,9 +267,10 @@
             code,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
+            passwordHash,
             members: {
               [state.clientId]: {
-                role: state.role,
+                role: 'pending',
                 joinedAt: serverTimestamp()
               }
             },
@@ -265,8 +291,13 @@
 
     async function joinRoom() {
       const code = state.roomInput.trim();
+      const password = state.roomPassword.trim();
       if (!ROOM_RE.test(code)) {
         updateLocal(() => { state.roomError = '房间号必须是 6 位数字。'; }, false);
+        return;
+      }
+      if (!validPassword(password)) {
+        updateLocal(() => { state.roomError = '登录密码必须是 6 位数字。'; }, false);
         return;
       }
       if (!firebaseConfigured) {
@@ -286,6 +317,10 @@
         if (!snapshot.exists()) throw new Error('这个房间不存在，请确认房间号。');
 
         const room = snapshot.val() || {};
+        const passwordHash = await hashPassword(password);
+        if (room.passwordHash !== passwordHash) {
+          throw new Error('登录密码不正确。');
+        }
         const members = room.members || {};
         const memberIds = Object.keys(members);
         const alreadyInRoom = Boolean(members[state.clientId]);
@@ -295,7 +330,7 @@
 
         await firebaseUpdate(targetRef, {
           [`members/${state.clientId}`]: {
-            role: state.role,
+            role: members[state.clientId]?.role || 'pending',
             joinedAt: serverTimestamp()
           },
           updatedAt: serverTimestamp()
@@ -393,6 +428,11 @@
     function renderRoleSelect() {
       return `
         <main class="flex flex-col items-center justify-center flex-1 py-20">
+          <div class="mb-8 bg-white border border-indigo-100 rounded-xl px-5 py-3 flex flex-wrap items-center justify-center gap-3 shadow-sm">
+            <span class="text-sm text-slate-500">已进入房间</span>
+            <span class="font-black text-indigo-700 tracking-widest">${escapeHtml(state.roomCode)}</span>
+            <button data-action="leave-room" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm font-bold">退出房间</button>
+          </div>
           <h2 class="text-3xl font-bold mb-10 text-slate-700">欢迎，请选择你的身份</h2>
           <div class="flex flex-col sm:flex-row gap-8">
             <button data-action="choose-role" data-role="A" class="w-64 h-64 bg-white border-4 border-blue-500 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all flex flex-col items-center justify-center group">
@@ -411,27 +451,28 @@
     }
 
     function renderRoomGate() {
-      const roleName = state.role === 'A' ? '甲方' : '乙方';
       return `
         <main class="flex justify-center py-12">
           <section class="bg-white border border-slate-200 shadow-sm rounded-2xl p-8 w-full max-w-2xl">
             <div class="flex items-center justify-between gap-4 border-b border-slate-100 pb-5 mb-6">
               <div>
-                <p class="text-sm text-slate-400 mb-1">当前身份</p>
-                <h2 class="text-2xl font-black text-slate-800">${roleName}</h2>
+                <p class="text-sm text-slate-400 mb-1">第一步</p>
+                <h2 class="text-2xl font-black text-slate-800">进入云端房间</h2>
               </div>
-              <button data-action="back-role" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold">重新选择身份</button>
+              <span class="text-sm text-slate-400">房间号和密码均为 6 位数字</span>
             </div>
             <div class="grid md:grid-cols-2 gap-6">
               <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <h3 class="font-bold text-lg mb-2 text-slate-800">创建房间</h3>
-                <p class="text-sm text-slate-500 mb-5">系统会自动生成 6 位数字房间号，并在云端创建一份新的共享数据。</p>
+                <p class="text-sm text-slate-500 mb-4">设置 6 位登录密码。系统会自动生成房间号，并创建一份新的共享数据。</p>
+                <input id="roomCreatePassword" value="${escapeHtml(state.roomCreatePassword)}" inputmode="numeric" maxlength="6" placeholder="设置登录密码" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <button data-action="create-room" ${state.roomBusy || !firebaseConfigured ? 'disabled' : ''} class="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">创建房间号</button>
               </div>
               <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <h3 class="font-bold text-lg mb-2 text-slate-800">加入房间</h3>
-                <p class="text-sm text-slate-500 mb-4">输入对方给你的 6 位数字房间号。每个房间最多两个人。</p>
+                <p class="text-sm text-slate-500 mb-4">输入对方给你的 6 位房间号和登录密码。每个房间最多两个人。</p>
                 <input id="roomInput" value="${escapeHtml(state.roomInput)}" inputmode="numeric" maxlength="6" placeholder="例如 123456" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
+                <input id="roomPassword" value="${escapeHtml(state.roomPassword)}" inputmode="numeric" maxlength="6" placeholder="登录密码" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <button data-action="join-room" ${state.roomBusy || !firebaseConfigured ? 'disabled' : ''} class="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">加入已有房间</button>
               </div>
             </div>
@@ -448,8 +489,11 @@
       }
 
       return state.tasks.map((task) => {
+        const isBounty = task.source === 'A';
         const textClass = task.done ? 'line-through text-slate-400' : 'font-medium text-slate-700';
-        const editControls = editable && state.b_state === 'planning' ? `
+        const canBEdit = editable && !isBounty && state.b_state === 'planning';
+        const canADelete = !editable && isBounty && state.b_state === 'planning';
+        const editControls = canBEdit ? `
           <div class="flex gap-2 ml-4 flex-shrink-0 mt-0.5">
             ${task.isEditing ? `
               <button data-action="save-edit" data-id="${task.id}" class="text-sm bg-green-100 text-green-600 hover:bg-green-200 px-3 py-1 rounded transition">保存</button>
@@ -458,13 +502,20 @@
               <button data-action="start-edit" data-id="${task.id}" class="text-sm bg-blue-100 text-blue-600 hover:bg-blue-200 px-3 py-1 rounded transition">修改</button>
               <button data-action="delete-task" data-id="${task.id}" class="text-sm bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded transition">删除</button>
             `}
+          </div>` : canADelete ? `
+          <div class="flex gap-2 ml-4 flex-shrink-0 mt-0.5">
+            <button data-action="delete-task" data-id="${task.id}" class="text-sm bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded transition">删除悬赏</button>
           </div>` : '';
 
         return `
-          <li class="flex items-start justify-between text-lg bg-slate-50 p-3 rounded-lg border border-slate-100 hover:border-slate-300 transition">
+          <li draggable="true" data-task-id="${task.id}" class="flex items-start justify-between text-lg p-3 rounded-lg border transition ${isBounty ? 'bg-amber-50 border-amber-200 hover:border-amber-300' : 'bg-slate-50 border-slate-100 hover:border-slate-300'}">
             <div class="flex items-start gap-4 flex-grow min-w-0">
               <input data-action="toggle-task" data-id="${task.id}" type="checkbox" ${task.done ? 'checked' : ''} ${editable && state.b_state === 'planning' ? '' : 'disabled'} class="w-6 h-6 mt-1 rounded border-slate-300 text-green-600 focus:ring-green-500 flex-shrink-0">
               <div class="flex-grow min-w-0">
+                ${isBounty ? `<div class="flex flex-wrap items-center gap-2 mb-1">
+                  <span class="bg-amber-200 text-amber-900 text-xs font-black px-2 py-0.5 rounded">甲方悬赏</span>
+                  <span class="bg-white text-amber-700 border border-amber-200 text-xs font-black px-2 py-0.5 rounded">完成奖励 ${moneyLabel(task.bountyAmount)}</span>
+                </div>` : ''}
                 ${task.isEditing ? `
                   <textarea data-edit-id="${task.id}" rows="2" class="w-full border-2 border-slate-300 rounded p-2 text-sm outline-none focus:border-green-500 transition resize-none">${escapeHtml(task.editTempText)}</textarea>
                 ` : `
@@ -541,9 +592,21 @@
     }
 
     function renderAView() {
+      const bountyForm = state.b_state === 'planning' ? `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+          <p class="font-bold text-amber-900 mb-3">发布悬赏任务</p>
+          <div class="grid md:grid-cols-[1fr_140px_auto] gap-3">
+            <textarea id="newBountyText" rows="2" placeholder="写下希望乙方完成的悬赏任务..." class="border-2 border-amber-200 rounded-lg p-3 outline-none focus:border-amber-400 transition resize-none">${escapeHtml(state.newBountyText || '')}</textarea>
+            <select id="newBountyAmount" class="border-2 border-amber-200 rounded-lg p-3 bg-white outline-none focus:border-amber-400 font-bold text-amber-800">
+              ${MONEY_VALUES.map((value) => `<option value="${value}" ${Number(state.newBountyAmount || 10) === value ? 'selected' : ''}>${moneyLabel(value)}</option>`).join('')}
+            </select>
+            <button data-action="add-bounty-task" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-lg transition">添加悬赏</button>
+          </div>
+        </div>` : '';
+
       const status = state.b_state === 'planning' ? `
         <div class="bg-slate-50 text-slate-500 p-4 rounded-lg border border-slate-100 font-medium">
-          乙方仍在安排或完成任务中，甲方目前无需操作。
+          乙方仍在安排或完成任务中；甲方可以继续发布悬赏任务。
         </div>` : `
         <div class="border-t-2 border-dashed border-slate-200 pt-6">
           <p class="font-bold text-lg mb-4 text-slate-700">乙方已结束一天。是否满意对方的工作量，并发放支票？</p>
@@ -570,6 +633,7 @@
       return `
         <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
           <h2 class="text-xl font-bold mb-6 text-slate-800 border-b pb-4">乙方日程监控</h2>
+          ${bountyForm}
           <ul class="space-y-3 mb-8 min-h-[150px] opacity-90">${renderTaskList(false)}</ul>
           ${status}
           ${nextPrompt}
@@ -662,11 +726,11 @@
     function render() {
       appRoot.innerHTML = `
         ${renderHeader()}
-        ${state.role === 'none'
-          ? renderRoleSelect()
-          : state.roomJoined
-            ? `<main class="grid grid-cols-1 gap-8">${state.role === 'B' ? renderBView() : renderAView()}</main>`
-            : renderRoomGate()
+        ${!state.roomJoined
+          ? renderRoomGate()
+          : state.role === 'none'
+            ? renderRoleSelect()
+            : `<main class="grid grid-cols-1 gap-8">${state.role === 'B' ? renderBView() : renderAView()}</main>`
         }
       `;
       bindInputs();
@@ -686,6 +750,32 @@
           event.target.value = state.roomInput;
         });
       }
+      const roomPassword = document.getElementById('roomPassword');
+      if (roomPassword) {
+        roomPassword.addEventListener('input', (event) => {
+          state.roomPassword = event.target.value.replace(/\D/g, '').slice(0, 6);
+          event.target.value = state.roomPassword;
+        });
+      }
+      const roomCreatePassword = document.getElementById('roomCreatePassword');
+      if (roomCreatePassword) {
+        roomCreatePassword.addEventListener('input', (event) => {
+          state.roomCreatePassword = event.target.value.replace(/\D/g, '').slice(0, 6);
+          event.target.value = state.roomCreatePassword;
+        });
+      }
+      const newBountyText = document.getElementById('newBountyText');
+      if (newBountyText) {
+        newBountyText.addEventListener('input', (event) => {
+          state.newBountyText = event.target.value;
+        });
+      }
+      const newBountyAmount = document.getElementById('newBountyAmount');
+      if (newBountyAmount) {
+        newBountyAmount.addEventListener('change', (event) => {
+          state.newBountyAmount = Number(event.target.value);
+        });
+      }
       document.querySelectorAll('[data-edit-id]').forEach((textarea) => {
         textarea.addEventListener('input', (event) => {
           const task = findTask(event.target.dataset.editId);
@@ -700,6 +790,18 @@
       return state.tasks.find((task) => String(task.id) === String(id));
     }
 
+    async function chooseRole(role) {
+      updateLocal(() => {
+        state.role = role;
+      });
+      if (activeRoomRef) {
+        await firebaseUpdate(activeRoomRef, {
+          [`members/${state.clientId}/role`]: role,
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+
     function addTask() {
       const text = state.newTaskText.trim();
       if (!text) return;
@@ -707,15 +809,39 @@
         id: state.nextTaskId++,
         text,
         done: false,
+        source: 'B',
+        bountyAmount: 0,
         isEditing: false,
         editTempText: ''
       });
       state.newTaskText = '';
     }
 
+    function addBountyTask() {
+      const text = (state.newBountyText || '').trim();
+      const bountyAmount = Number(state.newBountyAmount || 10);
+      if (!text || !MONEY_VALUES.includes(bountyAmount)) return;
+      state.tasks.push({
+        id: state.nextTaskId++,
+        text,
+        done: false,
+        source: 'A',
+        bountyAmount,
+        isEditing: false,
+        editTempText: ''
+      });
+      state.newBountyText = '';
+      state.newBountyAmount = 10;
+    }
+
     function approveNextDay() {
       if (state.a_satisfied) {
         const details = [];
+        const completedBounties = state.tasks.filter((task) => task.source === 'A' && task.done && task.bountyAmount > 0);
+        completedBounties.forEach((task) => {
+          state.checks[task.bountyAmount] += 1;
+          details.push(`悬赏 ${moneyLabel(task.bountyAmount)}：${task.text}`);
+        });
         MONEY_VALUES.forEach((value) => {
           const count = state.a_reward[value];
           if (count > 0) {
@@ -815,16 +941,17 @@
       if (action === 'join-room') { joinRoom(); return; }
       if (action === 'export') { exportData(); return; }
       if (action === 'clear') { clearData(); return; }
+      if (action === 'choose-role') { chooseRole(target.dataset.role); return; }
+      if (action === 'leave-room') { leaveRoom(); return; }
+      if (action === 'switch-role') { chooseRole(state.role === 'A' ? 'B' : 'A'); return; }
 
       updateLocal(() => {
-        if (action === 'choose-role') state.role = target.dataset.role;
         if (action === 'back-role') {
           state.role = 'none';
           state.roomError = '';
         }
-        if (action === 'leave-room') leaveRoom();
-        if (action === 'switch-role') state.role = state.role === 'A' ? 'B' : 'A';
         if (action === 'add-task') addTask();
+        if (action === 'add-bounty-task') addBountyTask();
         if (action === 'toggle-task') {
           const task = findTask(target.dataset.id);
           if (task && state.b_state === 'planning') task.done = target.checked;
@@ -903,24 +1030,39 @@
 
     appRoot.addEventListener('dragstart', (event) => {
       const card = event.target.closest('[data-drag-value]');
-      if (!card) return;
-      const value = Number(card.dataset.dragValue);
-      if (state.checks[value] <= 0) {
-        event.preventDefault();
+      if (card) {
+        const value = Number(card.dataset.dragValue);
+        if (state.checks[value] <= 0) {
+          event.preventDefault();
+          return;
+        }
+        state.draggedAmount = value;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(value));
         return;
       }
-      state.draggedAmount = value;
+
+      const taskItem = event.target.closest('[data-task-id]');
+      if (!taskItem || state.b_state !== 'planning') return;
+      state.draggedTaskId = Number(taskItem.dataset.taskId);
       event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(value));
+      event.dataTransfer.setData('text/plain', `task:${state.draggedTaskId}`);
     });
 
     appRoot.addEventListener('dragover', (event) => {
       const zone = event.target.closest('[data-drop-zone]');
-      if (!zone) return;
-      event.preventDefault();
-      if (!state.isDragOver) {
-        state.isDragOver = true;
-        render();
+      if (zone) {
+        event.preventDefault();
+        if (!state.isDragOver) {
+          state.isDragOver = true;
+          render();
+        }
+        return;
+      }
+
+      const taskItem = event.target.closest('[data-task-id]');
+      if (taskItem && state.draggedTaskId !== null) {
+        event.preventDefault();
       }
     });
 
@@ -933,17 +1075,34 @@
 
     appRoot.addEventListener('drop', (event) => {
       const zone = event.target.closest('[data-drop-zone]');
-      if (!zone) return;
-      event.preventDefault();
-      const value = Number(state.draggedAmount || event.dataTransfer.getData('text/plain'));
-      updateLocal(() => {
-        state.isDragOver = false;
-        if (MONEY_VALUES.includes(value) && state.checks[value] > 0) {
-          state.checks[value] -= 1;
-          state.logs.push({ day: state.day, amount: value });
-        }
-        state.draggedAmount = null;
-      });
+      if (zone) {
+        event.preventDefault();
+        const value = Number(state.draggedAmount || event.dataTransfer.getData('text/plain'));
+        updateLocal(() => {
+          state.isDragOver = false;
+          if (MONEY_VALUES.includes(value) && state.checks[value] > 0) {
+            state.checks[value] -= 1;
+            state.logs.push({ day: state.day, amount: value });
+          }
+          state.draggedAmount = null;
+        });
+        return;
+      }
+
+      const targetTask = event.target.closest('[data-task-id]');
+      if (targetTask && state.draggedTaskId !== null) {
+        event.preventDefault();
+        const targetId = Number(targetTask.dataset.taskId);
+        updateLocal(() => {
+          const fromIndex = state.tasks.findIndex((task) => task.id === state.draggedTaskId);
+          const toIndex = state.tasks.findIndex((task) => task.id === targetId);
+          if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
+            const [moved] = state.tasks.splice(fromIndex, 1);
+            state.tasks.splice(toIndex, 0, moved);
+          }
+          state.draggedTaskId = null;
+        });
+      }
     });
 
     loadLocal();
