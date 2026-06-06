@@ -330,6 +330,7 @@
             shared: extractSharedState()
           });
           rememberRoomPassword(code, password);
+          state.roomCreatePassword = '';
           joinRoomListener(code);
           return;
         }
@@ -437,6 +438,7 @@
         state.roomJoined = false;
         state.roomCode = '';
         state.roomInput = '';
+        state.roomCreatePassword = '';
         state.cloudStatus = firebaseConfigured ? '已退出房间' : 'Firebase 未配置，当前只能本地使用';
       }, false);
     }
@@ -527,7 +529,7 @@
               <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <h3 class="font-bold text-lg mb-2 text-slate-800">创建房间</h3>
                 <p class="text-sm text-slate-500 mb-4">设置 6 位登录密码。系统会自动生成房间号，并创建一份新的共享数据。</p>
-                <input id="roomCreatePassword" value="${escapeHtml(state.roomCreatePassword)}" inputmode="numeric" maxlength="6" placeholder="设置登录密码" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
+                <input id="roomCreatePassword" value="${escapeHtml(state.roomCreatePassword)}" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="设置登录密码" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <button data-action="create-room" ${state.roomBusy || !firebaseConfigured ? 'disabled' : ''} class="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">创建房间号</button>
               </div>
               <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
