@@ -47,6 +47,7 @@
 
     const STORAGE_KEY = 'dailyTaskSave';
     const CLIENT_ID_KEY = 'dailyTaskClientId';
+    const CREDENTIALS_KEY = 'dailyTaskCredentials';
     const MONEY_VALUES = [10, 20, 50, 100];
     const ROOM_RE = /^[0-9]{6}$/;
 
@@ -176,6 +177,10 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         role: state.role,
         roomInput: state.roomInput,
+        roomPassword: state.roomPassword,
+        roomCreatePassword: state.roomCreatePassword,
+        rolePasswordA: state.rolePasswordA,
+        rolePasswordB: state.rolePasswordB,
         roomCode: state.roomCode,
         roomJoined: state.roomJoined,
         ...extractSharedState()
@@ -189,7 +194,12 @@
         const parsed = JSON.parse(saved);
         state.role = parsed.role || 'none';
         state.roomInput = parsed.roomInput || '';
+        state.roomPassword = parsed.roomPassword || '';
+        state.roomCreatePassword = parsed.roomCreatePassword || '';
+        state.rolePasswordA = parsed.rolePasswordA || '';
+        state.rolePasswordB = parsed.rolePasswordB || '';
         state.roomCode = parsed.roomCode || '';
+        applyRememberedPasswords(state.roomCode || state.roomInput);
         applySharedState(parsed);
       } catch (error) {
         console.error('存档读取失败：', error);
@@ -238,6 +248,47 @@
       return ROOM_RE.test(password);
     }
 
+    function loadCredentials() {
+      try {
+        return JSON.parse(localStorage.getItem(CREDENTIALS_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function saveCredentials(credentials) {
+      localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials));
+    }
+
+    function rememberRoomPassword(roomCode, password) {
+      if (!ROOM_RE.test(roomCode) || !validPassword(password)) return;
+      const credentials = loadCredentials();
+      credentials.rooms = credentials.rooms || {};
+      credentials.rooms[roomCode] = credentials.rooms[roomCode] || {};
+      credentials.rooms[roomCode].roomPassword = password;
+      saveCredentials(credentials);
+    }
+
+    function rememberRolePassword(roomCode, role, password) {
+      if (!ROOM_RE.test(roomCode) || !['A', 'B'].includes(role) || !validPassword(password)) return;
+      const credentials = loadCredentials();
+      credentials.rooms = credentials.rooms || {};
+      credentials.rooms[roomCode] = credentials.rooms[roomCode] || {};
+      credentials.rooms[roomCode].rolePasswords = credentials.rooms[roomCode].rolePasswords || {};
+      credentials.rooms[roomCode].rolePasswords[role] = password;
+      saveCredentials(credentials);
+    }
+
+    function applyRememberedPasswords(roomCode) {
+      if (!ROOM_RE.test(roomCode)) return;
+      const roomCredentials = loadCredentials().rooms?.[roomCode];
+      if (!roomCredentials) return;
+      state.roomPassword = roomCredentials.roomPassword || state.roomPassword;
+      state.roomCreatePassword = roomCredentials.roomPassword || state.roomCreatePassword;
+      state.rolePasswordA = roomCredentials.rolePasswords?.A || state.rolePasswordA;
+      state.rolePasswordB = roomCredentials.rolePasswords?.B || state.rolePasswordB;
+    }
+
     function roomPath(code) {
       return `rooms/${code}`;
     }
@@ -280,6 +331,7 @@
             },
             shared: extractSharedState()
           });
+          rememberRoomPassword(code, password);
           joinRoomListener(code);
           return;
         }
@@ -339,6 +391,7 @@
           },
           updatedAt: serverTimestamp()
         });
+        rememberRoomPassword(code, password);
         joinRoomListener(code);
       } catch (error) {
         updateLocal(() => {
@@ -355,6 +408,7 @@
       state.role = 'none';
       state.roomCode = code;
       state.roomInput = code;
+      applyRememberedPasswords(code);
       state.roomJoined = true;
       state.roomBusy = false;
       state.roomError = '';
@@ -760,6 +814,11 @@
         roomInput.addEventListener('input', (event) => {
           state.roomInput = event.target.value.replace(/\D/g, '').slice(0, 6);
           event.target.value = state.roomInput;
+          if (state.roomInput.length === 6) {
+            applyRememberedPasswords(state.roomInput);
+            const passwordInput = document.getElementById('roomPassword');
+            if (passwordInput) passwordInput.value = state.roomPassword;
+          }
         });
       }
       const roomPassword = document.getElementById('roomPassword');
@@ -862,12 +921,11 @@
         await firebaseUpdate(activeRoomRef, {
           ...updates
         });
+        rememberRolePassword(state.roomCode, role, password);
         updateLocal(() => {
           state.role = role;
           state.roleBusy = false;
           state.roleError = '';
-          state.rolePasswordA = '';
-          state.rolePasswordB = '';
         });
       } catch (error) {
         updateLocal(() => {
