@@ -413,8 +413,6 @@
       state.roomBusy = false;
       state.roomError = '';
       state.roleError = '';
-      state.rolePasswordA = '';
-      state.rolePasswordB = '';
       state.cloudStatus = `已连接房间 ${code}`;
       saveLocal();
 
@@ -819,6 +817,7 @@
             const passwordInput = document.getElementById('roomPassword');
             if (passwordInput) passwordInput.value = state.roomPassword;
           }
+          saveLocal();
         });
       }
       const roomPassword = document.getElementById('roomPassword');
@@ -826,6 +825,7 @@
         roomPassword.addEventListener('input', (event) => {
           state.roomPassword = event.target.value.replace(/\D/g, '').slice(0, 6);
           event.target.value = state.roomPassword;
+          saveLocal();
         });
       }
       const roomCreatePassword = document.getElementById('roomCreatePassword');
@@ -833,6 +833,7 @@
         roomCreatePassword.addEventListener('input', (event) => {
           state.roomCreatePassword = event.target.value.replace(/\D/g, '').slice(0, 6);
           event.target.value = state.roomCreatePassword;
+          saveLocal();
         });
       }
       const newBountyText = document.getElementById('newBountyText');
@@ -852,6 +853,7 @@
         rolePasswordA.addEventListener('input', (event) => {
           state.rolePasswordA = event.target.value.replace(/\D/g, '').slice(0, 6);
           event.target.value = state.rolePasswordA;
+          saveLocal();
         });
       }
       const rolePasswordB = document.getElementById('rolePasswordB');
@@ -859,6 +861,7 @@
         rolePasswordB.addEventListener('input', (event) => {
           state.rolePasswordB = event.target.value.replace(/\D/g, '').slice(0, 6);
           event.target.value = state.rolePasswordB;
+          saveLocal();
         });
       }
       document.querySelectorAll('[data-edit-id]').forEach((textarea) => {
