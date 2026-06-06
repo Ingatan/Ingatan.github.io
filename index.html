@@ -835,6 +835,17 @@
         const snapshot = await get(activeRoomRef);
         const room = snapshot.val() || {};
         const passwordHashes = room.rolePasswordHashes || {};
+        const members = room.members || {};
+        const currentMemberRole = members[state.clientId]?.role;
+        if (currentMemberRole && currentMemberRole !== 'pending' && currentMemberRole !== role) {
+          throw new Error(`当前设备已经绑定为${currentMemberRole === 'A' ? '甲方' : '乙方'}，不能切换为另一方。`);
+        }
+        const roleTakenByOtherMember = Object.entries(members).some(([memberId, member]) => (
+          memberId !== state.clientId && member?.role === role
+        ));
+        if (roleTakenByOtherMember) {
+          throw new Error(`${role === 'A' ? '甲方' : '乙方'}身份已经被房间内另一位成员绑定。`);
+        }
         const passwordHash = await hashPassword(password);
         const existingHash = passwordHashes[role];
         if (existingHash && existingHash !== passwordHash) {
