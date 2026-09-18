@@ -326,12 +326,6 @@
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             passwordHash,
-            members: {
-              [state.clientId]: {
-                role: 'pending',
-                joinedAt: serverTimestamp()
-              }
-            },
             shared: extractSharedState()
           });
           rememberRoomPassword(code, password);
@@ -381,18 +375,7 @@
         if (room.passwordHash !== passwordHash) {
           throw new Error('登录密码不正确。');
         }
-        const members = room.members || {};
-        const memberIds = Object.keys(members);
-        const alreadyInRoom = Boolean(members[state.clientId]);
-        if (!alreadyInRoom && memberIds.length >= 2) {
-          throw new Error('这个房间已经满员，最多只能容纳两个人。');
-        }
-
         await firebaseUpdate(targetRef, {
-          [`members/${state.clientId}`]: {
-            role: members[state.clientId]?.role || 'pending',
-            joinedAt: serverTimestamp()
-          },
           updatedAt: serverTimestamp()
         });
         rememberRoomPassword(code, password);
@@ -423,6 +406,21 @@
       onValue(activeRoomRef, (snapshot) => {
         const room = snapshot.val();
         if (!room?.shared) return;
+        if (state.role !== 'none' && room.members?.[state.clientId]?.role !== state.role) {
+          clearTimeout(cloudSaveTimer);
+          off(activeRoomRef);
+          activeRoomRef = null;
+          state.role = 'none';
+          state.roleBusy = false;
+          state.roomJoined = false;
+          state.roomCode = '';
+          state.roomInput = code;
+          state.roomError = '当前身份已在其他设备登录，本设备已自动退出。';
+          state.cloudStatus = '身份已被其他设备接替';
+          saveLocal();
+          render();
+          return;
+        }
         syncingFromCloud = true;
         applySharedState(room.shared);
         state.cloudStatus = `已连接房间 ${code}`;
@@ -539,7 +537,7 @@
               </div>
               <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <h3 class="font-bold text-lg mb-2 text-slate-800">加入房间</h3>
-                <p class="text-sm text-slate-500 mb-4">输入对方给你的 6 位房间号和登录密码。每个房间最多两个人。</p>
+                <p class="text-sm text-slate-500 mb-4">输入对方给你的 6 位房间号和登录密码。甲、乙方各有一个席位，并可更换设备登录。</p>
                 <input id="roomInput" value="${escapeHtml(state.roomInput)}" inputmode="numeric" maxlength="6" placeholder="例如 123456" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <input id="roomPassword" value="${escapeHtml(state.roomPassword)}" inputmode="numeric" maxlength="6" placeholder="登录密码" class="w-full border-2 border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 tracking-[.3em] text-center font-black text-lg mb-3">
                 <button data-action="join-room" ${state.roomBusy || !firebaseConfigured ? 'disabled' : ''} class="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">加入已有房间</button>
@@ -953,22 +951,35 @@
         if (currentMemberRole && currentMemberRole !== 'pending' && currentMemberRole !== role) {
           throw new Error(`当前设备已经绑定为${currentMemberRole === 'A' ? '甲方' : '乙方'}，不能切换为另一方。`);
         }
-        const roleTakenByOtherMember = Object.entries(members).some(([memberId, member]) => (
-          memberId !== state.clientId && member?.role === role
-        ));
-        if (roleTakenByOtherMember) {
-          throw new Error(`${role === 'A' ? '甲方' : '乙方'}身份已经被房间内另一位成员绑定。`);
-        }
         const passwordHash = await hashPassword(password);
         const existingHash = passwordHashes[role];
         if (existingHash && existingHash !== passwordHash) {
           throw new Error(`${role === 'A' ? '甲方' : '乙方'}密码不正确。`);
         }
 
+        const roleLabel = role === 'A' ? '甲方' : '乙方';
+        const replacedMemberIds = Object.entries(members)
+          .filter(([memberId, member]) => memberId !== state.clientId && member?.role === role)
+          .map(([memberId]) => memberId);
+        if (replacedMemberIds.length > 0 && !confirm(`${roleLabel}已在其他设备登录。是否让当前设备接替，并退出原设备？`)) {
+          updateLocal(() => {
+            state.roleBusy = false;
+          }, false);
+          return;
+        }
+
         const updates = {
-          [`members/${state.clientId}/role`]: role,
+          [`members/${state.clientId}`]: {
+            role,
+            joinedAt: serverTimestamp()
+          },
           updatedAt: serverTimestamp()
         };
+        Object.entries(members).forEach(([memberId, member]) => {
+          if (memberId !== state.clientId && (member?.role === role || member?.role === 'pending')) {
+            updates[`members/${memberId}`] = null;
+          }
+        });
         if (!existingHash) {
           updates[`rolePasswordHashes/${role}`] = passwordHash;
         }
