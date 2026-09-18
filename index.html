@@ -6,15 +6,20 @@
   <title>DailyTaskReward</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { min-height: 100vh; }
+    html { overflow-x: hidden; }
+    body { min-height: 100vh; overflow-x: hidden; }
     .check-card { cursor: grab; user-select: none; transition: transform .12s ease, opacity .12s ease; }
     .check-card:active { cursor: grabbing; transform: scale(.96); }
     .check-card.disabled { cursor: not-allowed; filter: grayscale(1); opacity: .45; }
     .modal-backdrop { backdrop-filter: blur(4px); }
+    @media (max-width: 767px) {
+      button, input, textarea, select { font-size: 16px; }
+      .mobile-safe-bottom { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen font-sans">
-  <div id="app" class="max-w-6xl mx-auto p-4 md:p-8 h-full flex flex-col"></div>
+  <div id="app" class="max-w-6xl mx-auto p-3 sm:p-4 md:p-8 h-full flex flex-col"></div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
@@ -460,7 +465,7 @@
       const roleText = state.role === 'A' ? '甲方（发钱方）' : state.role === 'B' ? '乙方（攒钱方）' : '未选择';
       const roleDot = state.role === 'A' ? 'bg-blue-500' : 'bg-green-500';
       const controls = state.role === 'none' ? '' : `
-        <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="w-full md:w-auto flex flex-wrap items-center justify-start md:justify-end gap-3">
           ${roomBadge}
           <span class="text-xs text-slate-400">${escapeHtml(state.cloudStatus)}</span>
           <div class="flex flex-wrap gap-2">
@@ -471,7 +476,7 @@
             </label>
             <button data-action="clear" class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm transition">重新开始</button>
           </div>
-          <span class="font-bold flex items-center gap-2 border-l pl-4 border-slate-300">
+          <span class="w-full sm:w-auto font-bold flex items-center gap-2 border-t sm:border-t-0 sm:border-l pt-3 sm:pt-0 sm:pl-4 border-slate-300">
             <span class="w-3 h-3 rounded-full ${roleDot}"></span>
             <span>当前视角：${roleText}</span>
           </span>
@@ -479,9 +484,9 @@
         </div>`;
 
       return `
-        <header class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <h1 class="text-2xl font-black text-indigo-600 tracking-wide">
-            Day ${state.day}<span class="text-slate-400 font-medium text-lg ml-2">| DailyTaskReward</span>
+        <header class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4 md:mb-8 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+          <h1 class="text-xl sm:text-2xl font-black text-indigo-600 tracking-wide break-words">
+            Day ${state.day}<span class="text-slate-400 font-medium text-base sm:text-lg ml-2">| DailyTaskReward</span>
           </h1>
           ${controls}
         </header>`;
@@ -489,22 +494,22 @@
 
     function renderRoleSelect() {
       return `
-        <main class="flex flex-col items-center justify-center flex-1 py-20">
-          <div class="mb-8 bg-white border border-indigo-100 rounded-xl px-5 py-3 flex flex-wrap items-center justify-center gap-3 shadow-sm">
+        <main class="flex flex-col items-center justify-center flex-1 py-6 sm:py-12 md:py-20">
+          <div class="mb-6 sm:mb-8 bg-white border border-indigo-100 rounded-xl px-4 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-3 shadow-sm">
             <span class="text-sm text-slate-500">已进入房间</span>
             <span class="font-black text-indigo-700 tracking-widest">${escapeHtml(state.roomCode)}</span>
             <button data-action="leave-room" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm font-bold">退出房间</button>
           </div>
-          <h2 class="text-3xl font-bold mb-10 text-slate-700">欢迎，请选择你的身份</h2>
-          <div class="flex flex-col sm:flex-row gap-8">
-            <div class="w-72 bg-white border-4 border-blue-500 rounded-3xl shadow-xl p-6 flex flex-col items-center">
+          <h2 class="text-2xl sm:text-3xl font-bold mb-6 sm:mb-10 text-slate-700 text-center">欢迎，请选择你的身份</h2>
+          <div class="flex flex-col sm:flex-row gap-5 sm:gap-8 w-full sm:w-auto">
+            <div class="w-full sm:w-72 bg-white border-4 border-blue-500 rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-6 flex flex-col items-center">
               <span class="text-6xl mb-4">💸</span>
               <span class="text-2xl font-bold text-blue-600">我是甲方</span>
               <span class="text-slate-500 mt-2 mb-5 font-medium">发钱方 / 监督者</span>
               <input id="rolePasswordA" value="${escapeHtml(state.rolePasswordA)}" inputmode="numeric" maxlength="6" placeholder="甲方密码" class="w-full border-2 border-blue-100 rounded-lg p-3 outline-none focus:border-blue-400 tracking-[.3em] text-center font-black text-lg mb-3">
               <button data-action="choose-role" data-role="A" ${state.roleBusy ? 'disabled' : ''} class="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition">进入甲方视角</button>
             </div>
-            <div class="w-72 bg-white border-4 border-green-500 rounded-3xl shadow-xl p-6 flex flex-col items-center">
+            <div class="w-full sm:w-72 bg-white border-4 border-green-500 rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-6 flex flex-col items-center">
               <span class="text-6xl mb-4">📝</span>
               <span class="text-2xl font-bold text-green-600">我是乙方</span>
               <span class="text-slate-500 mt-2 mb-5 font-medium">攒钱方 / 执行者</span>
@@ -519,9 +524,9 @@
 
     function renderRoomGate() {
       return `
-        <main class="flex justify-center py-12">
-          <section class="bg-white border border-slate-200 shadow-sm rounded-2xl p-8 w-full max-w-2xl">
-            <div class="flex items-center justify-between gap-4 border-b border-slate-100 pb-5 mb-6">
+        <main class="flex justify-center py-3 sm:py-8 md:py-12">
+          <section class="bg-white border border-slate-200 shadow-sm rounded-xl sm:rounded-2xl p-4 sm:p-8 w-full max-w-2xl">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 border-b border-slate-100 pb-5 mb-6">
               <div>
                 <p class="text-sm text-slate-400 mb-1">第一步</p>
                 <h2 class="text-2xl font-black text-slate-800">进入云端房间</h2>
@@ -555,28 +560,33 @@
         return `<li class="text-slate-400 italic flex items-center justify-center min-h-24">${editable ? '还没有制定计划，快在上方添加吧。' : '乙方今日尚未添加任何计划。'}</li>`;
       }
 
-      return state.tasks.map((task) => {
+      return state.tasks.map((task, taskIndex) => {
         const isBounty = task.source === 'A';
         const textClass = task.done ? 'line-through text-slate-400' : 'font-medium text-slate-700';
         const canBEdit = editable && !isBounty && state.b_state === 'planning';
         const canADelete = !editable && isBounty && state.b_state === 'planning';
+        const sortControls = state.b_state === 'planning' ? `
+          <div class="flex sm:hidden gap-2 ml-auto flex-shrink-0">
+            <button data-action="move-task" data-id="${task.id}" data-direction="up" ${taskIndex === 0 ? 'disabled' : ''} title="上移" aria-label="上移任务" class="w-11 h-11 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold disabled:opacity-30">↑</button>
+            <button data-action="move-task" data-id="${task.id}" data-direction="down" ${taskIndex === state.tasks.length - 1 ? 'disabled' : ''} title="下移" aria-label="下移任务" class="w-11 h-11 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold disabled:opacity-30">↓</button>
+          </div>` : '';
         const editControls = canBEdit ? `
-          <div class="flex gap-2 ml-4 flex-shrink-0 mt-0.5">
+          <div class="flex flex-wrap gap-2 sm:ml-4 flex-shrink-0 mt-2 sm:mt-0.5">
             ${task.isEditing ? `
-              <button data-action="save-edit" data-id="${task.id}" class="text-sm bg-green-100 text-green-600 hover:bg-green-200 px-3 py-1 rounded transition">保存</button>
-              <button data-action="cancel-edit" data-id="${task.id}" class="text-sm bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-1 rounded transition">取消</button>
+              <button data-action="save-edit" data-id="${task.id}" class="text-sm bg-green-100 text-green-600 hover:bg-green-200 px-3 py-2 sm:py-1 min-h-11 sm:min-h-0 rounded transition">保存</button>
+              <button data-action="cancel-edit" data-id="${task.id}" class="text-sm bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-2 sm:py-1 min-h-11 sm:min-h-0 rounded transition">取消</button>
             ` : `
-              <button data-action="start-edit" data-id="${task.id}" class="text-sm bg-blue-100 text-blue-600 hover:bg-blue-200 px-3 py-1 rounded transition">修改</button>
-              <button data-action="delete-task" data-id="${task.id}" class="text-sm bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded transition">删除</button>
+              <button data-action="start-edit" data-id="${task.id}" class="text-sm bg-blue-100 text-blue-600 hover:bg-blue-200 px-3 py-2 sm:py-1 min-h-11 sm:min-h-0 rounded transition">修改</button>
+              <button data-action="delete-task" data-id="${task.id}" class="text-sm bg-red-100 text-red-600 hover:bg-red-200 px-3 py-2 sm:py-1 min-h-11 sm:min-h-0 rounded transition">删除</button>
             `}
           </div>` : canADelete ? `
-          <div class="flex gap-2 ml-4 flex-shrink-0 mt-0.5">
-            <button data-action="delete-task" data-id="${task.id}" class="text-sm bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded transition">删除悬赏</button>
+          <div class="flex gap-2 sm:ml-4 flex-shrink-0 mt-2 sm:mt-0.5">
+            <button data-action="delete-task" data-id="${task.id}" class="text-sm bg-red-100 text-red-600 hover:bg-red-200 px-3 py-2 sm:py-1 min-h-11 sm:min-h-0 rounded transition">删除悬赏</button>
           </div>` : '';
 
         return `
-          <li draggable="true" data-task-id="${task.id}" class="flex items-start justify-between text-lg p-3 rounded-lg border transition ${isBounty ? 'bg-amber-50 border-amber-200 hover:border-amber-300' : 'bg-slate-50 border-slate-100 hover:border-slate-300'}">
-            <div class="flex items-start gap-4 flex-grow min-w-0">
+          <li draggable="true" data-task-id="${task.id}" class="flex flex-col sm:flex-row sm:items-start sm:justify-between text-base sm:text-lg p-3 rounded-lg border transition ${isBounty ? 'bg-amber-50 border-amber-200 hover:border-amber-300' : 'bg-slate-50 border-slate-100 hover:border-slate-300'}">
+            <div class="flex items-start gap-3 sm:gap-4 flex-grow min-w-0 w-full">
               <input data-action="toggle-task" data-id="${task.id}" type="checkbox" ${task.done ? 'checked' : ''} ${editable && state.b_state === 'planning' ? '' : 'disabled'} class="w-6 h-6 mt-1 rounded border-slate-300 text-green-600 focus:ring-green-500 flex-shrink-0">
               <div class="flex-grow min-w-0">
                 ${isBounty ? `<div class="flex flex-wrap items-center gap-2 mb-1">
@@ -589,6 +599,7 @@
                   <div class="whitespace-pre-wrap break-words ${textClass}">${escapeHtml(task.text)}</div>
                 `}
               </div>
+              ${sortControls}
             </div>
             ${editControls}
           </li>`;
@@ -599,7 +610,7 @@
       const selfReview = state.tasks.length && state.b_state === 'planning' ? `
         <div class="border-t-2 border-dashed border-slate-200 pt-6">
           <p class="font-bold text-lg mb-4 text-slate-700">每日自评：是否满意自己今天完成的工作量？</p>
-          <div class="flex gap-4">
+          <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <button data-action="b-satisfied" data-value="true" class="px-6 py-3 rounded-xl font-bold transition ${buttonClass(state.b_satisfied === true, 'green')}">满意</button>
             <button data-action="b-satisfied" data-value="false" class="px-6 py-3 rounded-xl font-bold transition ${buttonClass(state.b_satisfied === false, 'red')}">不满意</button>
           </div>
@@ -611,7 +622,7 @@
         </div>` : '';
 
       const nextPrompt = state.b_satisfied !== null && state.b_state === 'planning' ? `
-        <div class="fixed bottom-32 right-8 bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 z-40 w-80 transform transition-all ${state.b_promptMinimized ? 'translate-y-48 opacity-50 hover:opacity-100 hover:translate-y-40 cursor-pointer' : ''}" data-action="${state.b_promptMinimized ? 'expand-b-prompt' : ''}">
+        <div class="fixed left-4 right-4 sm:left-auto sm:right-8 bottom-24 sm:bottom-32 bg-white p-5 sm:p-6 rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200 z-40 sm:w-80 transform transition-all ${state.b_promptMinimized ? 'translate-y-16 sm:translate-y-48 opacity-50 hover:opacity-100 sm:hover:translate-y-40 cursor-pointer' : ''}" data-action="${state.b_promptMinimized ? 'expand-b-prompt' : ''}">
           ${state.b_promptMinimized ? `
             <div class="text-center font-bold text-indigo-600">展开：是否进入下一天？</div>
           ` : `
@@ -624,22 +635,22 @@
         </div>` : '';
 
       return `
-        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <div class="bg-white p-4 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-end mb-4">
             <button data-action="open-history" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition">查看历史 Schedule</button>
           </div>
           <h2 class="text-xl font-bold mb-6 text-slate-800 border-b pb-4">Schedule</h2>
           ${state.b_state === 'planning' ? `
-            <div class="flex mb-6">
-              <textarea id="newTaskText" rows="2" placeholder="输入今天的计划内容，支持换行..." class="flex-grow border-2 border-r-0 border-slate-300 rounded-l-lg p-3 outline-none focus:border-green-500 transition resize-none">${escapeHtml(state.newTaskText)}</textarea>
-              <button data-action="add-task" class="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-3 rounded-r-lg transition">添加日程</button>
+            <div class="flex flex-col sm:flex-row mb-6 gap-2 sm:gap-0">
+              <textarea id="newTaskText" rows="2" placeholder="输入今天的计划内容，支持换行..." class="flex-grow border-2 sm:border-r-0 border-slate-300 rounded-lg sm:rounded-r-none p-3 outline-none focus:border-green-500 transition resize-none">${escapeHtml(state.newTaskText)}</textarea>
+              <button data-action="add-task" class="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-3 rounded-lg sm:rounded-l-none transition min-h-12">添加日程</button>
             </div>` : ''}
           <ul class="space-y-3 mb-8 min-h-[150px]">${renderTaskList(true)}</ul>
           ${selfReview}
           ${waiting}
           ${nextPrompt}
         </div>
-        <button data-action="open-warehouse" class="fixed bottom-8 right-8 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-yellow-900 font-extrabold px-6 py-4 rounded-full shadow-2xl flex items-center justify-center transform hover:scale-110 transition z-30 border-2 border-yellow-300">支票仓库</button>
+        <button data-action="open-warehouse" class="mobile-safe-bottom fixed right-4 sm:right-8 bottom-4 sm:bottom-8 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-yellow-900 font-extrabold px-5 sm:px-6 py-3 sm:py-4 rounded-full shadow-2xl flex items-center justify-center transform hover:scale-105 transition z-30 border-2 border-yellow-300">支票仓库</button>
         ${state.warehouseOpen ? renderWarehouse() : ''}`;
     }
 
@@ -648,7 +659,7 @@
       return `
         <div class="mt-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
           <p class="font-bold text-slate-700 mb-3">请选择要发放的支票类型和数量：</p>
-          <div class="flex flex-wrap gap-4">
+          <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-3 sm:gap-4">
             ${MONEY_VALUES.map((value) => `
               <div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
                 <span class="font-medium text-yellow-700 w-12 text-center bg-yellow-50 rounded">${moneyLabel(value)}</span>
@@ -680,7 +691,7 @@
         </div>` : `
         <div class="border-t-2 border-dashed border-slate-200 pt-6">
           <p class="font-bold text-lg mb-4 text-slate-700">乙方已结束一天。是否满意对方的工作量，并发放支票？</p>
-          <div class="flex gap-4">
+          <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <button data-action="a-satisfied" data-value="true" class="px-6 py-3 rounded-xl font-bold transition ${buttonClass(state.a_satisfied === true, 'blue')}">满意，发支票</button>
             <button data-action="a-satisfied" data-value="false" class="px-6 py-3 rounded-xl font-bold transition ${buttonClass(state.a_satisfied === false, 'red')}">不满意，不发放</button>
           </div>
@@ -688,7 +699,7 @@
         </div>`;
 
       const nextPrompt = state.a_satisfied !== null ? `
-        <div class="fixed bottom-8 right-8 bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 z-40 w-80 transform transition-all ${state.a_promptMinimized ? 'translate-y-48 opacity-50 hover:opacity-100 hover:translate-y-40 cursor-pointer' : ''}" data-action="${state.a_promptMinimized ? 'expand-a-prompt' : ''}">
+        <div class="fixed left-4 right-4 sm:left-auto sm:right-8 bottom-4 sm:bottom-8 bg-white p-5 sm:p-6 rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200 z-40 sm:w-80 transform transition-all ${state.a_promptMinimized ? 'translate-y-16 sm:translate-y-48 opacity-50 hover:opacity-100 sm:hover:translate-y-40 cursor-pointer' : ''}" data-action="${state.a_promptMinimized ? 'expand-a-prompt' : ''}">
           ${state.a_promptMinimized ? `
             <div class="text-center font-bold text-blue-600">展开：是否同意进入下一天？</div>
           ` : `
@@ -701,7 +712,7 @@
         </div>` : '';
 
       return `
-        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <div class="bg-white p-4 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200">
           <h2 class="text-xl font-bold mb-6 text-slate-800 border-b pb-4">乙方日程监控</h2>
           <div class="flex justify-end mb-4">
             <button data-action="open-history" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition">查看历史 Schedule</button>
@@ -716,13 +727,13 @@
     function renderHistoryModal() {
       const entries = [...(state.scheduleHistory || [])].reverse();
       return `
-        <div class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 p-4 modal-backdrop">
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[82vh] flex flex-col overflow-hidden border border-slate-200">
-            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 p-0 sm:p-4 modal-backdrop">
+          <div class="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[82vh] flex flex-col overflow-hidden border border-slate-200">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 class="text-xl font-black text-slate-800">历史 Schedule</h3>
               <button data-action="close-history" class="text-3xl leading-none text-slate-500 hover:text-slate-900">&times;</button>
             </div>
-            <div class="p-6 overflow-y-auto space-y-5">
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-5">
               ${entries.length ? entries.map((entry) => renderHistoryEntry(entry)).join('') : `
                 <div class="text-center text-slate-400 border border-dashed border-slate-200 rounded-xl py-10">暂无历史记录。进入下一天后会自动保存当天 Schedule。</div>
               `}
@@ -755,17 +766,17 @@
 
     function renderWarehouse() {
       return `
-        <div class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 p-4 modal-backdrop">
-          <div class="bg-white rounded-3xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col overflow-hidden border border-slate-200">
-            <div class="px-8 py-5 bg-gradient-to-r from-amber-200 to-yellow-400 text-yellow-900 font-black text-2xl flex justify-between items-center border-b border-yellow-500">
-              <div class="flex items-center gap-3">
+        <div class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 p-0 sm:p-4 modal-backdrop">
+          <div class="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full max-w-6xl h-[100dvh] sm:h-[80vh] flex flex-col overflow-hidden border border-slate-200">
+            <div class="px-4 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-amber-200 to-yellow-400 text-yellow-900 font-black text-xl sm:text-2xl flex justify-between items-center border-b border-yellow-500 flex-shrink-0">
+              <div class="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
                 <span>我的支票仓库</span>
-                <span class="bg-white text-sm px-3 py-1 rounded-full border border-yellow-500">资产管理</span>
+                <span class="hidden sm:inline bg-white text-sm px-3 py-1 rounded-full border border-yellow-500">资产管理</span>
               </div>
               <button data-action="close-warehouse" class="text-4xl hover:text-white transition w-10 h-10 flex items-center justify-center rounded-full hover:bg-yellow-600 hover:bg-opacity-30">&times;</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-hidden">
-              <section class="border-r border-slate-200 bg-amber-50 p-6 overflow-y-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-y-auto md:overflow-hidden">
+              <section class="md:border-r border-b md:border-b-0 border-slate-200 bg-amber-50 p-4 sm:p-6 md:overflow-y-auto">
                 <h3 class="text-xl font-bold mb-6 text-slate-800">合成区域</h3>
                 <p class="text-sm text-slate-500 mb-4">低额支票可以合成为高额支票：</p>
                 <div class="space-y-4 font-medium">
@@ -774,27 +785,28 @@
                   ${combineRow('2 张 ¥50 → 1 张 ¥100', '50', state.checks[50] < 2)}
                 </div>
               </section>
-              <section class="border-r border-slate-200 bg-white p-6 flex flex-col overflow-hidden">
+              <section class="md:border-r border-b md:border-b-0 border-slate-200 bg-white p-4 sm:p-6 flex flex-col md:overflow-hidden">
                 <h3 class="text-xl font-bold mb-2 text-slate-800">存储区</h3>
-                <p class="text-sm text-slate-400 mb-6 italic">按住并拖拽下方支票到右侧交付区即可兑现。</p>
-                <div class="grid grid-cols-2 gap-6 content-start mb-4 overflow-y-auto" style="height: 58%;">
+                <p class="hidden md:block text-sm text-slate-400 mb-6 italic">按住并拖拽下方支票到右侧交付区即可兑现。</p>
+                <div class="grid grid-cols-2 gap-3 sm:gap-6 content-start mb-4 md:h-[58%] md:overflow-y-auto">
                   ${MONEY_VALUES.map((value) => `
-                    <div class="flex flex-col items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <div draggable="${state.checks[value] > 0}" data-drag-value="${value}" class="check-card ${state.checks[value] === 0 ? 'disabled' : ''} w-28 h-16 bg-gradient-to-br from-yellow-100 to-yellow-300 border-2 border-yellow-500 rounded-lg shadow-md flex items-center justify-center relative overflow-hidden">
+                    <div class="flex flex-col items-center p-2 sm:p-4 bg-slate-50 rounded-xl border border-slate-100 min-w-0">
+                      <div draggable="${state.checks[value] > 0}" data-drag-value="${value}" class="check-card ${state.checks[value] === 0 ? 'disabled' : ''} w-full max-w-28 aspect-[7/4] bg-gradient-to-br from-yellow-100 to-yellow-300 border-2 border-yellow-500 rounded-lg shadow-md flex items-center justify-center relative overflow-hidden">
                         <span class="font-black text-yellow-800 text-xl z-10">${moneyLabel(value)}</span>
                       </div>
-                      <span class="mt-3 text-slate-700 font-bold bg-white px-3 py-1 rounded-full shadow-sm text-sm border border-slate-200">
+                      <span class="mt-3 text-slate-700 font-bold bg-white px-2 sm:px-3 py-1 rounded-full shadow-sm text-xs sm:text-sm border border-slate-200 whitespace-nowrap">
                         拥有：<span class="text-indigo-600">${state.checks[value]}</span> 张
                       </span>
+                      <button data-action="redeem-check" data-value="${value}" ${state.checks[value] <= 0 ? 'disabled' : ''} class="md:hidden mt-2 w-full min-h-11 rounded-lg bg-green-500 text-white font-bold disabled:bg-slate-300 disabled:text-slate-500">兑现</button>
                     </div>
                   `).join('')}
                 </div>
                 <h3 class="text-lg font-bold mb-3 text-slate-700 border-t border-slate-200 pt-4">存取日志</h3>
                 <ul class="flex-1 overflow-y-auto space-y-2 pr-2 min-h-0">${renderStorageLogs()}</ul>
               </section>
-              <section class="bg-green-50 p-6 flex flex-col overflow-hidden">
+              <section class="bg-green-50 p-4 sm:p-6 flex flex-col md:overflow-hidden">
                 <h3 class="text-xl font-bold mb-6 text-slate-800">交付区</h3>
-                <div data-drop-zone="true" class="w-full h-40 border-4 border-dashed rounded-2xl flex flex-col items-center justify-center mb-8 transition-colors select-none ${state.isDragOver ? 'border-green-500 bg-green-200 scale-105' : 'border-green-400 bg-green-100 hover:bg-green-200 text-green-700'}">
+                <div data-drop-zone="true" class="hidden md:flex w-full h-40 border-4 border-dashed rounded-2xl flex-col items-center justify-center mb-8 transition-colors select-none ${state.isDragOver ? 'border-green-500 bg-green-200 scale-105' : 'border-green-400 bg-green-100 hover:bg-green-200 text-green-700'}">
                   <span class="font-bold text-lg text-green-800">拖拽支票到此框内完成兑现</span>
                   <span class="text-sm text-green-600 mt-1">现实中由甲方发放等值货币</span>
                 </div>
@@ -1216,6 +1228,15 @@
         if (action === 'delete-task') {
           state.tasks = state.tasks.filter((task) => String(task.id) !== String(target.dataset.id));
         }
+        if (action === 'move-task' && state.b_state === 'planning') {
+          const fromIndex = state.tasks.findIndex((task) => String(task.id) === String(target.dataset.id));
+          const offset = target.dataset.direction === 'up' ? -1 : 1;
+          const toIndex = fromIndex + offset;
+          if (fromIndex >= 0 && toIndex >= 0 && toIndex < state.tasks.length) {
+            const [moved] = state.tasks.splice(fromIndex, 1);
+            state.tasks.splice(toIndex, 0, moved);
+          }
+        }
         if (action === 'b-satisfied') {
           state.b_satisfied = target.dataset.value === 'true';
           state.b_promptMinimized = false;
@@ -1246,6 +1267,13 @@
         if (action === 'expand-a-prompt') state.a_promptMinimized = false;
         if (action === 'open-warehouse') state.warehouseOpen = true;
         if (action === 'close-warehouse') state.warehouseOpen = false;
+        if (action === 'redeem-check') {
+          const value = Number(target.dataset.value);
+          if (MONEY_VALUES.includes(value) && state.checks[value] > 0) {
+            state.checks[value] -= 1;
+            state.logs.push({ day: state.day, amount: value });
+          }
+        }
         if (action === 'combine') {
           const value = target.dataset.value;
           if (value === '10' && state.checks[10] >= 2) {
